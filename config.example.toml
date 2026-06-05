@@ -1,10 +1,28 @@
 # Brigid example config — copy to ~/.config/brigid/config.toml and edit.
 
-[ollama]
-model   = "qwen3.6:35b-a3b"
+[brigid]
+# Which model profile is active at startup (must name a [models.<name>] below).
+# If omitted, the first defined profile is used.
+default = "qwen"
+# System-wide default Ollama host. Optional; each model may override it.
 host    = "http://localhost:11434"
-options = { temperature = 0.7, num_ctx = 32768 }
+
+# --- Models ----------------------------------------------------------------
+# Each [models.<name>] is a self-contained model profile. In the REPL, switch
+# between them with `/model <name>`; `/model` with no argument lists them.
+#   model         — the Ollama model id (defaults to the profile name if omitted)
+#   options       — passed to Ollama (num_ctx, temperature, ...)
+#   system_prompt — optional; replaces the active system prompt on switch
+#   host          — optional; overrides [brigid].host for this profile only
+
+[models.qwen]
+model         = "qwen3.6:35b-a3b"
+options       = { temperature = 0.7, num_ctx = 32768 }
 # system_prompt = "You are a careful local agent. Prefer reading before writing."
+
+[models.hermes]
+model   = "hermes3-8b"
+options = { temperature = 0.7, num_ctx = 32768 }
 
 [runtime]
 max_steps_per_turn   = 25
