@@ -51,3 +51,23 @@ def test_config_set_with_leading_system_replaces_head_only():
     assert out[1:] == msgs[1:]
     # Original list is not mutated.
     assert msgs[0] == {"role": "system", "content": "old prompt"}
+
+
+def test_client_rebuilt_when_host_changes():
+    cfg = OllamaConfig(host="http://a:11434")
+    sentinel = object()
+    b = OllamaBackend(cfg, client=sentinel)  # type: ignore[arg-type]
+    assert b.client is sentinel
+    cfg.host = "http://b:11434"
+    b._ensure_client()
+    assert b.client is not sentinel
+    assert b._client_host == "http://b:11434"
+
+
+def test_client_not_rebuilt_when_host_unchanged():
+    cfg = OllamaConfig(host="http://a:11434")
+    sentinel = object()
+    b = OllamaBackend(cfg, client=sentinel)  # type: ignore[arg-type]
+    b._ensure_client()
+    assert b.client is sentinel
+    assert b._client_host == "http://a:11434"

@@ -22,6 +22,13 @@ class OllamaBackend:
     def __init__(self, cfg: OllamaConfig, client: AsyncClient | None = None) -> None:
         self.cfg = cfg
         self.client = client or AsyncClient(host=cfg.host)
+        self._client_host = cfg.host
+
+    def _ensure_client(self) -> None:
+        """Rebuild the transport client if the active host changed (e.g. after /model)."""
+        if self.cfg.host != self._client_host:
+            self.client = AsyncClient(host=self.cfg.host)
+            self._client_host = self.cfg.host
 
     async def stream(
         self,
@@ -31,6 +38,7 @@ class OllamaBackend:
         """Stream chat parts from the model. Yields the raw ollama parts so the
         caller can inspect `.message.content`, `.message.thinking`, and on the
         final part `.message.tool_calls` plus `.done`."""
+        self._ensure_client()
         prepared = self._with_system_prompt(messages)
         stream = await self.client.chat(
             model=self.cfg.model,
