@@ -40,10 +40,13 @@ class OllamaBackend:
         final part `.message.tool_calls` plus `.done`."""
         self._ensure_client()
         prepared = self._with_system_prompt(messages)
+        # Profiles can opt out of tools (cfg.tools=False) — e.g. conversation-only
+        # models whose Ollama template would 400 on a tools request.
+        offered_tools = (tools or None) if self.cfg.tools else None
         stream = await self.client.chat(
             model=self.cfg.model,
             messages=prepared,
-            tools=tools or None,
+            tools=offered_tools,
             stream=True,
             options=self.cfg.options or None,
         )
