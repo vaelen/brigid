@@ -1,0 +1,55 @@
+# Brigid example config — copy to ~/.config/brigid/config.toml and edit.
+
+[ollama]
+model   = "qwen3.6:35b-a3b"
+host    = "http://localhost:11434"
+options = { temperature = 0.7, num_ctx = 32768 }
+# system_prompt = "You are a careful local agent. Prefer reading before writing."
+
+[runtime]
+max_steps_per_turn   = 25
+persist_permissions  = true   # write [permissions] back to this file on exit
+
+[tools.fs]
+# Built-in fs tools refuse to read/write outside this root. Use "/" to disable.
+root = "."
+
+[tools.bash]
+timeout_seconds = 60
+
+[tools.web]
+max_bytes       = 200_000
+timeout_seconds = 30
+
+[permissions]
+# Patterns are fnmatch globs over per-tool permission keys, e.g.
+#   bash:git status*       fs.write:/Users/me/repos/**       web.fetch:https://docs.python.org/**
+# Resolution order: deny first, then allow, then interactive prompt.
+allow = [
+    "fs.read:*",
+    "fs.list:*",
+    "bash:ls *",
+    "bash:git status*",
+    "bash:git diff*",
+    "bash:git log*",
+]
+deny = [
+    "bash:rm -rf *",
+    "bash:sudo *",
+    "fs.write:/etc/*",
+]
+
+# --- MCP servers -----------------------------------------------------------
+# Each connected server's tools appear namespaced as `mcp.<name>.<tool>`.
+# Use ${env:VAR} anywhere a string is expected to interpolate from the environment.
+
+# [[mcp.servers]]
+# name    = "filesystem"
+# command = "npx"
+# args    = ["-y", "@modelcontextprotocol/server-filesystem", "/Users/me/sandbox"]
+
+# [[mcp.servers]]
+# name    = "github"
+# command = "uvx"
+# args    = ["mcp-server-github"]
+# env     = { GITHUB_TOKEN = "${env:GITHUB_TOKEN}" }

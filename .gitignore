@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.pyright/
+
+# uv
+.venv/
+# Keep uv.lock — committed for reproducibility
+
+# OS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Local config (may contain user paths / tokens)
+config.toml
+config.local.toml
