@@ -6,14 +6,16 @@ from __future__ import annotations
 import asyncio
 import json
 from contextlib import AsyncExitStack
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Protocol
 
 import tomli_w
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.history import FileHistory
 
-from brigid.config import Config
+from brigid.config import Config, OllamaConfig
 from brigid.errors import BrigidError, MCPConnectionError
 from brigid.llm import OllamaBackend
 from brigid.permissions import PermissionGate
@@ -24,6 +26,21 @@ from brigid.tools.builtin import builtin_tools
 from brigid.tools.mcp_bridge import MCPManager
 
 HISTORY_PATH = Path.home() / ".local" / "state" / "brigid" / "history"
+
+
+class _RendererProto(Protocol):
+    """Structural type for what _handle_slash needs from a renderer."""
+
+    console: Any
+    show_thinking: bool
+
+    def on_error(self, err: BaseException) -> None: ...
+
+
+@dataclass
+class _ActiveModel:
+    name: str
+    cfg: OllamaConfig
 
 
 async def run(cfg: Config) -> int:
@@ -53,10 +70,12 @@ async def run(cfg: Config) -> int:
                 renderer.on_error(e)
                 console.print("[dim]continuing without MCP tools[/dim]")
 
-        llm = OllamaBackend(cfg.ollama)
+        active_name, active_cfg = cfg.active()
+        active = _ActiveModel(active_name, active_cfg)
+        llm = OllamaBackend(active.cfg)
         session = ConversationSession(llm, registry, gate, cfg.runtime, renderer=renderer)
 
-        _print_banner(console, cfg, registry)
+        _print_banner(console, active, registry)
 
         while True:
             try:
@@ -69,7 +88,7 @@ async def run(cfg: Config) -> int:
             if not stripped:
                 continue
             if stripped.startswith("/"):
-                if not await _handle_slash(stripped, cfg, session, registry, renderer):
+                if not await _handle_slash(stripped, cfg, active, session, registry, renderer):
                     break
                 continue
 
@@ -101,9 +120,10 @@ async def run(cfg: Config) -> int:
 async def _handle_slash(
     line: str,
     cfg: Config,
-    session: ConversationSession,
-    registry: ToolRegistry,
-    renderer: RichRenderer,
+    active: _ActiveModel,
+    session: ConversationSession | None,
+    registry: ToolRegistry | None,
+    renderer: _RendererProto,
 ) -> bool:
     """Return False to exit the REPL, True to keep going."""
     parts = line.split(maxsplit=1)
@@ -117,30 +137,48 @@ async def _handle_slash(
         console.print(_HELP_TEXT)
         return True
     if cmd == "/tools":
+        assert registry is not None
         for tool in registry:
             short = tool.description.splitlines()[0] if tool.description else ""
             console.print(f"  [bold]{tool.name}[/bold] — {short}")
         return True
     if cmd == "/clear":
+        assert session is not None
         session.clear()
         console.print("[dim]conversation cleared[/dim]")
         return True
     if cmd == "/model":
         if not arg:
-            console.print(f"current model: [bold]{cfg.ollama.model}[/bold]")
+            _print_models(console, cfg, active)
         else:
-            cfg.ollama.model = arg.strip()
-            console.print(f"model set to [bold]{cfg.ollama.model}[/bold]")
+            name = arg.strip()
+            resolved = cfg.resolve(name)
+            if resolved is None:
+                avail = ", ".join(cfg.profile_names()) or "(none defined)"
+                console.print(f"unknown model: [bold]{name}[/bold] — available: {avail}")
+            else:
+                active.name = name
+                active.cfg.model = resolved.model
+                active.cfg.host = resolved.host
+                active.cfg.options = resolved.options
+                active.cfg.system_prompt = resolved.system_prompt
+                ctx = resolved.options.get("num_ctx")
+                ctx_note = f", num_ctx={ctx}" if ctx is not None else ""
+                host_note = f", host={resolved.host}" if resolved.host != cfg.brigid.host else ""
+                console.print(
+                    f"model set to [bold]{name}[/bold] "
+                    f"([dim]{resolved.model}{ctx_note}{host_note}[/dim])"
+                )
         return True
     if cmd == "/system":
         if not arg:
-            current = cfg.ollama.system_prompt or "(none)"
+            current = active.cfg.system_prompt or "(none)"
             console.print(f"current system prompt:\n[dim]{current}[/dim]")
         elif arg.strip() == "clear":
-            cfg.ollama.system_prompt = None
+            active.cfg.system_prompt = None
             console.print("[dim]system prompt cleared[/dim]")
         else:
-            cfg.ollama.system_prompt = arg
+            active.cfg.system_prompt = arg
             console.print(f"[dim]system prompt set ({len(arg)} chars)[/dim]")
         return True
     if cmd == "/allow":
@@ -168,6 +206,7 @@ async def _handle_slash(
         if not arg:
             console.print("usage: /save <path>")
             return True
+        assert session is not None
         try:
             Path(arg).write_text(json.dumps(session.messages, indent=2, default=str))
             console.print(f"saved {len(session.messages)} messages to {arg}")
@@ -178,6 +217,7 @@ async def _handle_slash(
         if not arg:
             console.print("usage: /load <path>")
             return True
+        assert session is not None
         try:
             data = json.loads(Path(arg).read_text())
             if not isinstance(data, list):
@@ -196,7 +236,7 @@ _HELP_TEXT = """\
 [bold]slash commands[/bold]
   /help                 show this help
   /tools                list registered tools
-  /model [name]         show or switch active model
+  /model [name]         list models or switch to a defined profile
   /system [text|clear]  show, set, or clear the system prompt
   /clear                wipe conversation history
   /save <path>          save session to a JSON file
@@ -214,10 +254,25 @@ press [bold]Ctrl-C[/bold] to cancel an in-flight turn; [bold]Ctrl-D[/bold] to qu
 # ---------------------------------------------------------------------------
 
 
-def _print_banner(console, cfg: Config, registry: ToolRegistry) -> None:
+def _print_models(console, cfg: Config, active: _ActiveModel) -> None:
+    names = cfg.profile_names()
+    if not names:
+        console.print("[dim]no models defined in config[/dim]")
+        return
+    width = max(len(n) for n in names)
+    for n in names:
+        prof = cfg.models[n]
+        ctx = prof.options.get("num_ctx", "—")
+        marker = "[green]●[/green]" if n == active.name else " "
+        console.print(f"  {marker} [bold]{n:<{width}}[/bold]  {prof.model}  (num_ctx={ctx})")
+    console.print(f"[dim]active: {active.name}[/dim]")
+
+
+def _print_banner(console, active: _ActiveModel, registry: ToolRegistry) -> None:
     console.print(
-        f"[bold]brigid[/bold] · model=[bold]{cfg.ollama.model}[/bold] · "
-        f"host={cfg.ollama.host} · {len(registry)} tool(s) loaded"
+        f"[bold]brigid[/bold] · model=[bold]{active.name}[/bold] "
+        f"([dim]{active.cfg.model}[/dim]) · host={active.cfg.host} · "
+        f"{len(registry)} tool(s) loaded"
     )
     console.print("[dim]/help for commands · Ctrl-D to quit[/dim]")
 

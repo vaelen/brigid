@@ -8,9 +8,9 @@ Local agentic chat harness backed by Ollama, with MCP server support and built-i
 # 1. Install (uv handles env + deps)
 uv sync
 
-# 2. Make sure ollama is running and the model is pulled
+# 2. Make sure ollama is running and a model is pulled
 ollama serve &           # if not already running
-ollama pull qwen3.6:35b-a3b
+ollama pull qwen3.6:35b-a3b   # matches the "qwen" profile in the example config
 
 # 3. Copy the example config
 mkdir -p ~/.config/brigid
@@ -26,7 +26,7 @@ uv run brigid
 |---|---|
 | `/help` | List slash commands |
 | `/tools` | List available tools (built-in + MCP) |
-| `/model <name>` | Switch the active Ollama model |
+| `/model [name]` | List configured model profiles, or switch to one by name |
 | `/system [text\|clear]` | Show, set, or clear the system prompt (effective on next turn) |
 | `/clear` | Wipe the conversation history |
 | `/save <path>` | Save the current session to a JSON file |
