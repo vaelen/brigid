@@ -40,6 +40,21 @@ class OllamaConfig:
 
 
 @dataclass(frozen=True)
+class BrigidConfig:
+    default: str | None = None
+    host: str = "http://localhost:11434"
+
+
+@dataclass(frozen=True)
+class ModelProfile:
+    name: str
+    model: str
+    options: dict[str, Any] = field(default_factory=dict)
+    system_prompt: str | None = None
+    host: str | None = None
+
+
+@dataclass(frozen=True)
 class RuntimeConfig:
     max_steps_per_turn: int = 25
     persist_permissions: bool = True
@@ -84,21 +99,59 @@ class MCPServerConfig:
 
 @dataclass
 class Config:
-    ollama: OllamaConfig = field(default_factory=OllamaConfig)
+    brigid: BrigidConfig = field(default_factory=BrigidConfig)
+    models: dict[str, ModelProfile] = field(default_factory=dict)
     runtime: RuntimeConfig = field(default_factory=RuntimeConfig)
     tools: ToolsConfig = field(default_factory=ToolsConfig)
     permissions: PermissionsConfig = field(default_factory=PermissionsConfig)
     mcp_servers: list[MCPServerConfig] = field(default_factory=list)
     source_path: Path | None = None
 
+    def profile_names(self) -> list[str]:
+        return list(self.models.keys())
 
-def _build_ollama(d: dict[str, Any]) -> OllamaConfig:
-    return OllamaConfig(
-        model=d.get("model", OllamaConfig.model),
-        host=d.get("host", OllamaConfig.host),
-        options=dict(d.get("options", {})),
-        system_prompt=d.get("system_prompt"),
+    def resolve(self, name: str) -> OllamaConfig | None:
+        prof = self.models.get(name)
+        if prof is None:
+            return None
+        return OllamaConfig(
+            model=prof.model,
+            host=prof.host or self.brigid.host,
+            options=dict(prof.options),
+            system_prompt=prof.system_prompt,
+        )
+
+    def active(self) -> tuple[str, OllamaConfig]:
+        name = self.brigid.default
+        if name is None:
+            name = next(iter(self.models), None)
+        if name is None:
+            return ("default", OllamaConfig())
+        resolved = self.resolve(name)
+        assert resolved is not None  # validated in from_dict
+        return (name, resolved)
+
+
+def _build_brigid(d: dict[str, Any]) -> BrigidConfig:
+    return BrigidConfig(
+        default=d.get("default"),
+        host=d.get("host", BrigidConfig.host),
     )
+
+
+def _build_models(d: dict[str, Any]) -> dict[str, ModelProfile]:
+    out: dict[str, ModelProfile] = {}
+    for name, entry in d.items():
+        if not isinstance(entry, dict):
+            raise ConfigError(f"[models.{name}] must be a table")
+        out[name] = ModelProfile(
+            name=name,
+            model=entry.get("model", name),
+            options=dict(entry.get("options", {})),
+            system_prompt=entry.get("system_prompt"),
+            host=entry.get("host"),
+        )
+    return out
 
 
 def _build_runtime(d: dict[str, Any]) -> RuntimeConfig:
@@ -150,8 +203,16 @@ def _build_mcp_servers(servers: list[dict[str, Any]]) -> list[MCPServerConfig]:
 def from_dict(raw: dict[str, Any]) -> Config:
     expanded = _expand_env_in(raw)
     mcp_block = expanded.get("mcp", {})
+    brigid = _build_brigid(expanded.get("brigid", {}))
+    models = _build_models(expanded.get("models", {}))
+    if brigid.default is not None and brigid.default not in models:
+        avail = ", ".join(models) or "(none)"
+        raise ConfigError(
+            f"[brigid].default = {brigid.default!r} is not a defined model; available: {avail}"
+        )
     return Config(
-        ollama=_build_ollama(expanded.get("ollama", {})),
+        brigid=brigid,
+        models=models,
         runtime=_build_runtime(expanded.get("runtime", {})),
         tools=_build_tools(expanded.get("tools", {})),
         permissions=_build_permissions(expanded.get("permissions", {})),
