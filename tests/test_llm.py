@@ -71,3 +71,43 @@ def test_client_not_rebuilt_when_host_unchanged():
     b._ensure_client()
     assert b.client is sentinel
     assert b._client_host == "http://a:11434"
+
+
+class _RecordingClient:
+    """Fake AsyncClient that records the `tools` kwarg from chat()."""
+
+    def __init__(self) -> None:
+        self.last_tools: object = "unset"
+
+    async def chat(self, **kwargs):
+        self.last_tools = kwargs.get("tools")
+
+        async def _gen():
+            return
+            yield  # pragma: no cover  (makes this an async generator)
+
+        return _gen()
+
+
+async def _drain(backend, schemas):
+    async for _ in backend.stream([{"role": "user", "content": "hi"}], schemas):
+        pass
+
+
+_SCHEMAS = [{"type": "function", "function": {"name": "x"}}]
+
+
+async def test_stream_passes_tools_when_enabled():
+    cfg = OllamaConfig(tools=True)
+    fake = _RecordingClient()
+    b = OllamaBackend(cfg, client=fake)  # type: ignore[arg-type]
+    await _drain(b, _SCHEMAS)
+    assert fake.last_tools == _SCHEMAS
+
+
+async def test_stream_suppresses_tools_when_disabled():
+    cfg = OllamaConfig(tools=False)
+    fake = _RecordingClient()
+    b = OllamaBackend(cfg, client=fake)  # type: ignore[arg-type]
+    await _drain(b, _SCHEMAS)
+    assert fake.last_tools is None

@@ -37,6 +37,7 @@ class OllamaConfig:
     host: str = "http://localhost:11434"
     options: dict[str, Any] = field(default_factory=dict)
     system_prompt: str | None = None
+    tools: bool = True  # when False, the backend never offers tools to this model
 
 
 @dataclass(frozen=True)
@@ -52,6 +53,7 @@ class ModelProfile:
     options: dict[str, Any] = field(default_factory=dict)
     system_prompt: str | None = None
     host: str | None = None
+    tools: bool = True
 
 
 @dataclass(frozen=True)
@@ -119,6 +121,7 @@ class Config:
             host=prof.host or self.brigid.host,
             options=dict(prof.options),
             system_prompt=prof.system_prompt,
+            tools=prof.tools,
         )
 
     def active(self) -> tuple[str, OllamaConfig]:
@@ -151,6 +154,7 @@ def _build_models(d: dict[str, Any]) -> dict[str, ModelProfile]:
             options=dict(entry.get("options", {})),
             system_prompt=entry.get("system_prompt"),
             host=entry.get("host"),
+            tools=bool(entry.get("tools", True)),
         )
     return out
 

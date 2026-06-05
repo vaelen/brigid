@@ -135,6 +135,18 @@ def test_resolve_unknown_returns_none():
     assert cfg.resolve("nope") is None
 
 
+def test_tools_flag_defaults_true_and_overrides():
+    cfg = from_dict({"models": {"a": {"model": "a"}, "b": {"model": "b", "tools": False}}})
+    assert cfg.models["a"].tools is True
+    assert cfg.models["b"].tools is False
+    resolved_a = cfg.resolve("a")
+    resolved_b = cfg.resolve("b")
+    assert resolved_a is not None
+    assert resolved_b is not None
+    assert resolved_a.tools is True
+    assert resolved_b.tools is False
+
+
 def test_env_substitution(monkeypatch, tmp_path):
     monkeypatch.setenv("MY_TOKEN", "s3cret")
     body = textwrap.dedent("""

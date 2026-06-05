@@ -14,6 +14,8 @@ host    = "http://localhost:11434"
 #   options       — passed to Ollama (num_ctx, temperature, ...)
 #   system_prompt — optional; replaces the active system prompt on switch
 #   host          — optional; overrides [brigid].host for this profile only
+#   tools         — optional bool (default true); set false for conversation-only
+#                   models whose Ollama template doesn't support tool calls
 
 [models.qwen]
 model         = "qwen3.6:35b-a3b"

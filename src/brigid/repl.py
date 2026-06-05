@@ -162,12 +162,14 @@ async def _handle_slash(
                 active.cfg.host = resolved.host
                 active.cfg.options = resolved.options
                 active.cfg.system_prompt = resolved.system_prompt
+                active.cfg.tools = resolved.tools
                 ctx = resolved.options.get("num_ctx")
                 ctx_note = f", num_ctx={ctx}" if ctx is not None else ""
                 host_note = f", host={resolved.host}" if resolved.host != cfg.brigid.host else ""
+                tools_note = "" if resolved.tools else ", tools off"
                 console.print(
                     f"model set to [bold]{name}[/bold] "
-                    f"([dim]{resolved.model}{ctx_note}{host_note}[/dim])"
+                    f"([dim]{resolved.model}{ctx_note}{host_note}{tools_note}[/dim])"
                 )
         return True
     if cmd == "/system":
@@ -264,7 +266,10 @@ def _print_models(console, cfg: Config, active: _ActiveModel) -> None:
         prof = cfg.models[n]
         ctx = prof.options.get("num_ctx", "—")
         marker = "[green]●[/green]" if n == active.name else " "
-        console.print(f"  {marker} [bold]{n:<{width}}[/bold]  {prof.model}  (num_ctx={ctx})")
+        tools_note = "" if prof.tools else "  [dim](no tools)[/dim]"
+        console.print(
+            f"  {marker} [bold]{n:<{width}}[/bold]  {prof.model}  (num_ctx={ctx}){tools_note}"
+        )
     console.print(f"[dim]active: {active.name}[/dim]")
 
 
