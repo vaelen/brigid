@@ -72,6 +72,7 @@ def test_load_valid_file(tmp_path):
     assert active.system_prompt == "You are Hermes."
     assert cfg.runtime.max_steps_per_turn == 10
     assert cfg.permissions.allow == ["fs.read:*"]
+    assert cfg.permissions.deny == ["bash:rm -rf *"]
     assert cfg.mcp_servers == [
         MCPServerConfig(
             name="fs",

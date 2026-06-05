@@ -128,7 +128,8 @@ class Config:
         if name is None:
             return ("default", OllamaConfig())
         resolved = self.resolve(name)
-        assert resolved is not None  # validated in from_dict
+        if resolved is None:
+            raise ConfigError(f"active model {name!r} not found in profiles")
         return (name, resolved)
 
 
