@@ -183,3 +183,13 @@ def test_malformed_toml_raises(tmp_path):
     path.write_text("not = valid = toml\n")
     with pytest.raises(ConfigError):
         load(path)
+
+
+def test_brigid_personality_field_parsed():
+    cfg = from_dict({"brigid": {"personality": "luna"}})
+    assert cfg.brigid.personality == "luna"
+
+
+def test_brigid_personality_defaults_none():
+    cfg = from_dict({})
+    assert cfg.brigid.personality is None

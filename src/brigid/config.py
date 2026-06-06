@@ -44,6 +44,7 @@ class OllamaConfig:
 class BrigidConfig:
     default: str | None = None
     host: str = "http://localhost:11434"
+    personality: str | None = None
 
 
 @dataclass(frozen=True)
@@ -140,6 +141,7 @@ def _build_brigid(d: dict[str, Any]) -> BrigidConfig:
     return BrigidConfig(
         default=d.get("default"),
         host=d.get("host", BrigidConfig.host),
+        personality=d.get("personality"),
     )
 
 
