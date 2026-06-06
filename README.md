@@ -22,19 +22,20 @@ uv run brigid
 
 ## Slash commands
 
-| Command | What it does |
-|---|---|
-| `/help` | List slash commands |
-| `/tools` | List available tools (built-in + MCP) |
-| `/model [name]` | List configured model profiles, or switch to one by name |
-| `/system [text\|clear]` | Show, set, or clear the system prompt (effective on next turn) |
-| `/clear` | Wipe the conversation history |
-| `/save <path>` | Save the current session to a JSON file |
-| `/load <path>` | Load a session from a JSON file |
-| `/allow <pattern>` | Add a permission allow pattern |
-| `/deny <pattern>` | Add a permission deny pattern |
-| `/thinking on\|off` | Show/hide model "thinking" output |
-| `/exit` | Quit |
+| Command                      | What it does                                                                                     |
+|------------------------------|--------------------------------------------------------------------------------------------------|
+| `/help`                      | List slash commands                                                                              |
+| `/tools`                     | List available tools (built-in + MCP)                                                            |
+| `/model [name]`              | List configured model profiles, or switch to one by name                                         |
+| `/system [text\|clear]`      | Show, set, or clear the system prompt (effective on next turn)                                   |
+| `/personality [name\|none]`  | Load a personality file as the system prompt, clear it (`none`), or list available personalities |
+| `/clear`                     | Wipe the conversation history                                                                    |
+| `/save <path>`               | Save the current session to a JSON file                                                          |
+| `/load <path>`               | Load a session from a JSON file                                                                  |
+| `/allow <pattern>`           | Add a permission allow pattern                                                                   |
+| `/deny <pattern>`            | Add a permission deny pattern                                                                    |
+| `/thinking on\|off`          | Show/hide model "thinking" output                                                                |
+| `/exit`                      | Quit                                                                                             |
 
 ## Permissions
 

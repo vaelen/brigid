@@ -6,6 +6,10 @@
 default = "qwen"
 # System-wide default Ollama host. Optional; each model may override it.
 host    = "http://localhost:11434"
+# Optional personality loaded at startup. Names a file in the personalities
+# directory (a `personalities/` folder next to this config file). The file's
+# contents become the system prompt and persist across `/model` switches.
+# personality = "luna"
 
 # --- Models ----------------------------------------------------------------
 # Each [models.<name>] is a self-contained model profile. In the REPL, switch
@@ -25,6 +29,14 @@ options       = { temperature = 0.7, num_ctx = 32768 }
 [models.hermes]
 model   = "hermes3-8b"
 options = { temperature = 0.7, num_ctx = 32768 }
+
+# --- Personalities ---------------------------------------------------------
+# A personality is a file whose contents become the system prompt. Put files in
+# a `personalities/` directory next to this config (e.g. personalities/luna).
+# In the REPL: `/personality luna` loads it, `/personality` lists them,
+# `/personality none` clears it. An active personality overrides a profile's
+# system_prompt and survives `/model` switches. Files may be named `<name>`,
+# `<name>.md`, or `<name>.txt` (resolved in that order).
 
 [runtime]
 max_steps_per_turn   = 25
