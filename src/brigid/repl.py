@@ -210,9 +210,7 @@ async def _handle_slash(
         body = cfg.load_personality(name)
         if body is None:
             available = ", ".join(cfg.list_personalities()) or "(none found)"
-            console.print(
-                f"unknown personality: [bold]{name}[/bold] — available: {available}"
-            )
+            console.print(f"unknown personality: [bold]{name}[/bold] — available: {available}")
             return True
         active.cfg.system_prompt = body
         active.personality = name

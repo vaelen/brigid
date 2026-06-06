@@ -172,8 +172,9 @@ async def test_model_switch_clears_stale_personality_marker(tmp_path):
 
 async def test_startup_personality_applied(tmp_path):
     cfg = _cfg_with_personalities(tmp_path, luna="You are Luna.")
-    cfg.brigid = from_dict({"brigid": {"default": "hermes", "personality": "luna"},
-                            "models": RAW["models"]}).brigid
+    cfg.brigid = from_dict(
+        {"brigid": {"default": "hermes", "personality": "luna"}, "models": RAW["models"]}
+    ).brigid
     active = _active(cfg)
     r = _FakeRenderer()
     _apply_startup_personality(cfg, active, r.console)
@@ -183,8 +184,9 @@ async def test_startup_personality_applied(tmp_path):
 
 async def test_startup_personality_missing_warns_and_continues(tmp_path):
     cfg = _cfg_with_personalities(tmp_path, luna="You are Luna.")
-    cfg.brigid = from_dict({"brigid": {"default": "hermes", "personality": "ghost"},
-                            "models": RAW["models"]}).brigid
+    cfg.brigid = from_dict(
+        {"brigid": {"default": "hermes", "personality": "ghost"}, "models": RAW["models"]}
+    ).brigid
     active = _active(cfg)
     before = active.cfg.system_prompt
     r = _FakeRenderer()

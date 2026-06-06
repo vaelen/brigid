@@ -1,6 +1,7 @@
 # Copyright 2026 Andrew C. Young <andrew@vaelen.org>
 # SPDX-License-Identifier: MIT
 
+
 class BrigidError(Exception):
     """Base error for Brigid."""
 
