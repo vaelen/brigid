@@ -201,7 +201,7 @@ def test_personalities_dir_relative_to_source_path(tmp_path):
     assert cfg.personalities_dir() == tmp_path / "personalities"
 
 
-def test_personalities_dir_defaults_to_home(tmp_path, monkeypatch):
+def test_personalities_dir_defaults_to_home(tmp_path):
     cfg = Config()  # no source_path
     assert cfg.source_path is None
     expected = Path.home() / ".config" / "brigid" / "personalities"
@@ -225,6 +225,14 @@ def test_load_personality_match_precedence(tmp_path):
 def test_load_personality_missing_returns_none(tmp_path):
     cfg = load(tmp_path / "config.toml")
     assert cfg.load_personality("nope") is None
+
+
+def test_load_personality_rejects_path_traversal(tmp_path):
+    (tmp_path / "secret").write_text("top secret")
+    pdir = tmp_path / "personalities"
+    pdir.mkdir()
+    cfg = load(tmp_path / "config.toml")
+    assert cfg.load_personality("../secret") is None
 
 
 def test_list_personalities_strips_extensions_and_sorts(tmp_path):

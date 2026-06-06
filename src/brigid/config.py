@@ -142,10 +142,15 @@ class Config:
         return DEFAULT_CONFIG_PATH.parent / "personalities"
 
     def load_personality(self, name: str) -> str | None:
-        base = self.personalities_dir()
-        for candidate in (base / name, base / f"{name}.md", base / f"{name}.txt"):
+        base = self.personalities_dir().resolve()
+        for suffix in ("", ".md", ".txt"):
+            candidate = (base / f"{name}{suffix}").resolve()
+            try:
+                candidate.relative_to(base)
+            except ValueError:
+                continue
             if candidate.is_file():
-                return candidate.read_text()
+                return candidate.read_text(encoding="utf-8")
         return None
 
     def list_personalities(self) -> list[str]:
