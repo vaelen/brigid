@@ -235,6 +235,16 @@ def test_load_personality_rejects_path_traversal(tmp_path):
     assert cfg.load_personality("../secret") is None
 
 
+def test_load_personality_rejects_symlink_escape(tmp_path):
+    secret = tmp_path / "secret"
+    secret.write_text("top secret")
+    pdir = tmp_path / "personalities"
+    pdir.mkdir()
+    (pdir / "luna").symlink_to(secret)  # symlink inside the dir pointing outside
+    cfg = load(tmp_path / "config.toml")
+    assert cfg.load_personality("luna") is None
+
+
 def test_list_personalities_strips_extensions_and_sorts(tmp_path):
     pdir = tmp_path / "personalities"
     pdir.mkdir()
