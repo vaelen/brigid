@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from brigid.config import from_dict, load
-from brigid.repl import _ActiveModel, _handle_slash
+from brigid.repl import _ActiveModel, _apply_startup_personality, _handle_slash
 
 RAW = {
     "brigid": {"default": "hermes"},
@@ -168,3 +168,37 @@ async def test_model_switch_clears_stale_personality_marker(tmp_path):
     await _handle_slash("/model stheno", cfg, active, None, None, _FakeRenderer())
     assert active.name == "stheno"
     assert active.personality is None
+
+
+async def test_startup_personality_applied(tmp_path):
+    cfg = _cfg_with_personalities(tmp_path, luna="You are Luna.")
+    cfg.brigid = from_dict({"brigid": {"default": "hermes", "personality": "luna"},
+                            "models": RAW["models"]}).brigid
+    active = _active(cfg)
+    r = _FakeRenderer()
+    _apply_startup_personality(cfg, active, r.console)
+    assert active.personality == "luna"
+    assert active.cfg.system_prompt == "You are Luna."
+
+
+async def test_startup_personality_missing_warns_and_continues(tmp_path):
+    cfg = _cfg_with_personalities(tmp_path, luna="You are Luna.")
+    cfg.brigid = from_dict({"brigid": {"default": "hermes", "personality": "ghost"},
+                            "models": RAW["models"]}).brigid
+    active = _active(cfg)
+    before = active.cfg.system_prompt
+    r = _FakeRenderer()
+    _apply_startup_personality(cfg, active, r.console)
+    assert active.personality is None
+    assert active.cfg.system_prompt == before  # unchanged
+    out = "\n".join(r.console.lines)
+    assert "ghost" in out
+
+
+async def test_startup_personality_none_is_noop(tmp_path):
+    cfg = _cfg_with_personalities(tmp_path, luna="You are Luna.")
+    active = _active(cfg)
+    before = active.cfg.system_prompt
+    _apply_startup_personality(cfg, active, _FakeRenderer().console)
+    assert active.personality is None
+    assert active.cfg.system_prompt == before

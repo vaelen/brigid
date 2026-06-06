@@ -73,6 +73,7 @@ async def run(cfg: Config) -> int:
 
         active_name, active_cfg = cfg.active()
         active = _ActiveModel(active_name, active_cfg)
+        _apply_startup_personality(cfg, active, console)
         llm = OllamaBackend(active.cfg)
         session = ConversationSession(llm, registry, gate, cfg.runtime, renderer=renderer)
 
@@ -289,6 +290,22 @@ press [bold]Ctrl-C[/bold] to cancel an in-flight turn; [bold]Ctrl-D[/bold] to qu
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _apply_startup_personality(cfg: Config, active: _ActiveModel, console) -> None:
+    name = cfg.brigid.personality
+    if name is None:
+        return
+    body = cfg.load_personality(name)
+    if body is None:
+        console.print(
+            f"[yellow]personality {name!r} not found in "
+            f"{cfg.personalities_dir()}; continuing without it[/yellow]"
+        )
+        return
+    active.cfg.system_prompt = body
+    active.personality = name
+    console.print(f"[dim]personality: [bold]{name}[/bold][/dim]")
 
 
 def _print_models(console, cfg: Config, active: _ActiveModel) -> None:
