@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -193,3 +194,50 @@ def test_brigid_personality_field_parsed():
 def test_brigid_personality_defaults_none():
     cfg = from_dict({})
     assert cfg.brigid.personality is None
+
+
+def test_personalities_dir_relative_to_source_path(tmp_path):
+    cfg = load(tmp_path / "config.toml")  # missing file: defaults, source_path set
+    assert cfg.personalities_dir() == tmp_path / "personalities"
+
+
+def test_personalities_dir_defaults_to_home(tmp_path, monkeypatch):
+    cfg = Config()  # no source_path
+    assert cfg.source_path is None
+    expected = Path.home() / ".config" / "brigid" / "personalities"
+    assert cfg.personalities_dir() == expected
+
+
+def test_load_personality_match_precedence(tmp_path):
+    pdir = tmp_path / "personalities"
+    pdir.mkdir()
+    (pdir / "luna.md").write_text("md body")
+    (pdir / "luna.txt").write_text("txt body")
+    (pdir / "luna").write_text("exact body")
+    cfg = load(tmp_path / "config.toml")
+    assert cfg.load_personality("luna") == "exact body"
+    (pdir / "luna").unlink()
+    assert cfg.load_personality("luna") == "md body"
+    (pdir / "luna.md").unlink()
+    assert cfg.load_personality("luna") == "txt body"
+
+
+def test_load_personality_missing_returns_none(tmp_path):
+    cfg = load(tmp_path / "config.toml")
+    assert cfg.load_personality("nope") is None
+
+
+def test_list_personalities_strips_extensions_and_sorts(tmp_path):
+    pdir = tmp_path / "personalities"
+    pdir.mkdir()
+    (pdir / "luna.md").write_text("x")
+    (pdir / "luna").write_text("x")  # dedupes with luna.md
+    (pdir / "atlas.txt").write_text("x")
+    (pdir / "zara").write_text("x")
+    cfg = load(tmp_path / "config.toml")
+    assert cfg.list_personalities() == ["atlas", "luna", "zara"]
+
+
+def test_list_personalities_missing_dir_returns_empty(tmp_path):
+    cfg = load(tmp_path / "config.toml")
+    assert cfg.list_personalities() == []

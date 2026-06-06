@@ -136,6 +136,34 @@ class Config:
             raise ConfigError(f"active model {name!r} not found in profiles")
         return (name, resolved)
 
+    def personalities_dir(self) -> Path:
+        if self.source_path is not None:
+            return self.source_path.parent / "personalities"
+        return DEFAULT_CONFIG_PATH.parent / "personalities"
+
+    def load_personality(self, name: str) -> str | None:
+        base = self.personalities_dir()
+        for candidate in (base / name, base / f"{name}.md", base / f"{name}.txt"):
+            if candidate.is_file():
+                return candidate.read_text()
+        return None
+
+    def list_personalities(self) -> list[str]:
+        base = self.personalities_dir()
+        if not base.is_dir():
+            return []
+        names: set[str] = set()
+        for entry in base.iterdir():
+            if not entry.is_file():
+                continue
+            stem = entry.name
+            for ext in (".md", ".txt"):
+                if stem.endswith(ext):
+                    stem = stem[: -len(ext)]
+                    break
+            names.add(stem)
+        return sorted(names)
+
 
 def _build_brigid(d: dict[str, Any]) -> BrigidConfig:
     return BrigidConfig(
