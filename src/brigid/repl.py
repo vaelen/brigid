@@ -166,7 +166,9 @@ async def _handle_slash(
                 active.cfg.tools = resolved.tools
                 if active.personality is not None:
                     body = cfg.load_personality(active.personality)
-                    if body is not None:
+                    if body is None:
+                        active.personality = None  # file gone — drop the stale marker
+                    else:
                         active.cfg.system_prompt = body
                 ctx = resolved.options.get("num_ctx")
                 ctx_note = f", num_ctx={ctx}" if ctx is not None else ""
@@ -272,7 +274,7 @@ _HELP_TEXT = """\
   /tools                list registered tools
   /model [name]         list models or switch to a defined profile
   /system [text|clear]  show, set, or clear the system prompt
-  /personality [name|none]  load a personality, clear it (none), or list available
+  /personality [name]   load a personality; "none" to clear; no arg lists
   /clear                wipe conversation history
   /save <path>          save session to a JSON file
   /load <path>          load session from a JSON file

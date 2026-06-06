@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from brigid.config import from_dict, load
 from brigid.repl import _ActiveModel, _handle_slash
 
@@ -128,6 +126,7 @@ async def test_personality_no_arg_shows_current_and_lists(tmp_path):
     out = "\n".join(r.console.lines)
     assert "luna" in out
     assert "atlas" in out
+    assert "active personality" in out
 
 
 async def test_personality_sticky_across_model_switch(tmp_path):
@@ -156,3 +155,16 @@ async def test_system_clear_clears_personality_marker(tmp_path):
     await _handle_slash("/system clear", cfg, active, None, None, _FakeRenderer())
     assert active.personality is None
     assert active.cfg.system_prompt is None
+
+
+async def test_model_switch_clears_stale_personality_marker(tmp_path):
+    """Fix 1 regression: if the personality file is gone, /model clears the marker."""
+    cfg = _cfg_with_personalities(tmp_path, luna="You are Luna.")
+    active = _active(cfg)
+    await _handle_slash("/personality luna", cfg, active, None, None, _FakeRenderer())
+    assert active.personality == "luna"
+    # delete the file so load_personality returns None
+    (tmp_path / "personalities" / "luna").unlink()
+    await _handle_slash("/model stheno", cfg, active, None, None, _FakeRenderer())
+    assert active.name == "stheno"
+    assert active.personality is None
