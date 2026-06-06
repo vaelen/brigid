@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
-from brigid.config import from_dict
+from pathlib import Path
+
+from brigid.config import from_dict, load
 from brigid.repl import _ActiveModel, _handle_slash
 
 RAW = {
@@ -74,3 +76,83 @@ async def test_model_unknown_reports_available_and_no_change():
     out = "\n".join(r.console.lines)
     assert "hermes" in out
     assert "stheno" in out
+
+
+def _cfg_with_personalities(tmp_path, **files):
+    pdir = tmp_path / "personalities"
+    pdir.mkdir()
+    for name, body in files.items():
+        (pdir / name).write_text(body)
+    cfg = load(tmp_path / "config.toml")  # missing file -> defaults, source_path set
+    # give it the same two profiles RAW defines, so /model works
+    cfg.models = from_dict(RAW).models
+    cfg.brigid = from_dict(RAW).brigid
+    return cfg
+
+
+async def test_personality_load_sets_prompt_and_marker(tmp_path):
+    cfg = _cfg_with_personalities(tmp_path, luna="You are Luna.")
+    active = _active(cfg)
+    r = _FakeRenderer()
+    cont = await _handle_slash("/personality luna", cfg, active, None, None, r)
+    assert cont is True
+    assert active.cfg.system_prompt == "You are Luna."
+    assert active.personality == "luna"
+
+
+async def test_personality_not_found_lists_available(tmp_path):
+    cfg = _cfg_with_personalities(tmp_path, luna="You are Luna.")
+    active = _active(cfg)
+    r = _FakeRenderer()
+    await _handle_slash("/personality ghost", cfg, active, None, None, r)
+    assert active.personality is None
+    out = "\n".join(r.console.lines)
+    assert "luna" in out
+
+
+async def test_personality_none_clears(tmp_path):
+    cfg = _cfg_with_personalities(tmp_path, luna="You are Luna.")
+    active = _active(cfg)
+    await _handle_slash("/personality luna", cfg, active, None, None, _FakeRenderer())
+    await _handle_slash("/personality none", cfg, active, None, None, _FakeRenderer())
+    assert active.cfg.system_prompt is None
+    assert active.personality is None
+
+
+async def test_personality_no_arg_shows_current_and_lists(tmp_path):
+    cfg = _cfg_with_personalities(tmp_path, luna="You are Luna.", atlas="You are Atlas.")
+    active = _active(cfg)
+    await _handle_slash("/personality luna", cfg, active, None, None, _FakeRenderer())
+    r = _FakeRenderer()
+    await _handle_slash("/personality", cfg, active, None, None, r)
+    out = "\n".join(r.console.lines)
+    assert "luna" in out
+    assert "atlas" in out
+
+
+async def test_personality_sticky_across_model_switch(tmp_path):
+    cfg = _cfg_with_personalities(tmp_path, luna="You are Luna.")
+    active = _active(cfg)  # starts on hermes (system_prompt "You are Hermes.")
+    await _handle_slash("/personality luna", cfg, active, None, None, _FakeRenderer())
+    await _handle_slash("/model stheno", cfg, active, None, None, _FakeRenderer())
+    assert active.name == "stheno"
+    assert active.personality == "luna"
+    assert active.cfg.system_prompt == "You are Luna."  # personality wins over profile
+
+
+async def test_system_set_clears_personality_marker(tmp_path):
+    cfg = _cfg_with_personalities(tmp_path, luna="You are Luna.")
+    active = _active(cfg)
+    await _handle_slash("/personality luna", cfg, active, None, None, _FakeRenderer())
+    await _handle_slash("/system You are generic.", cfg, active, None, None, _FakeRenderer())
+    assert active.personality is None
+    assert active.cfg.system_prompt == "You are generic."
+
+
+async def test_system_clear_clears_personality_marker(tmp_path):
+    cfg = _cfg_with_personalities(tmp_path, luna="You are Luna.")
+    active = _active(cfg)
+    await _handle_slash("/personality luna", cfg, active, None, None, _FakeRenderer())
+    await _handle_slash("/system clear", cfg, active, None, None, _FakeRenderer())
+    assert active.personality is None
+    assert active.cfg.system_prompt is None

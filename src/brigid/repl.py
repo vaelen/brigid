@@ -41,6 +41,7 @@ class _RendererProto(Protocol):
 class _ActiveModel:
     name: str
     cfg: OllamaConfig
+    personality: str | None = None
 
 
 async def run(cfg: Config) -> int:
@@ -163,6 +164,10 @@ async def _handle_slash(
                 active.cfg.options = resolved.options
                 active.cfg.system_prompt = resolved.system_prompt
                 active.cfg.tools = resolved.tools
+                if active.personality is not None:
+                    body = cfg.load_personality(active.personality)
+                    if body is not None:
+                        active.cfg.system_prompt = body
                 ctx = resolved.options.get("num_ctx")
                 ctx_note = f", num_ctx={ctx}" if ctx is not None else ""
                 host_note = f", host={resolved.host}" if resolved.host != cfg.brigid.host else ""
@@ -178,10 +183,37 @@ async def _handle_slash(
             console.print(f"current system prompt:\n[dim]{current}[/dim]")
         elif arg.strip() == "clear":
             active.cfg.system_prompt = None
+            active.personality = None
             console.print("[dim]system prompt cleared[/dim]")
         else:
             active.cfg.system_prompt = arg
+            active.personality = None
             console.print(f"[dim]system prompt set ({len(arg)} chars)[/dim]")
+        return True
+    if cmd == "/personality":
+        if not arg:
+            current = active.personality or "(none)"
+            console.print(f"active personality: [bold]{current}[/bold]")
+            available = cfg.list_personalities()
+            listing = ", ".join(available) if available else "(none found)"
+            console.print(f"[dim]available: {listing}[/dim]")
+            return True
+        name = arg.strip()
+        if name == "none":
+            active.cfg.system_prompt = None
+            active.personality = None
+            console.print("[dim]personality cleared[/dim]")
+            return True
+        body = cfg.load_personality(name)
+        if body is None:
+            available = ", ".join(cfg.list_personalities()) or "(none found)"
+            console.print(
+                f"unknown personality: [bold]{name}[/bold] — available: {available}"
+            )
+            return True
+        active.cfg.system_prompt = body
+        active.personality = name
+        console.print(f"[dim]personality set to [bold]{name}[/bold] ({len(body)} chars)[/dim]")
         return True
     if cmd == "/allow":
         if not arg:
@@ -240,6 +272,7 @@ _HELP_TEXT = """\
   /tools                list registered tools
   /model [name]         list models or switch to a defined profile
   /system [text|clear]  show, set, or clear the system prompt
+  /personality [name|none]  load a personality, clear it (none), or list available
   /clear                wipe conversation history
   /save <path>          save session to a JSON file
   /load <path>          load session from a JSON file
