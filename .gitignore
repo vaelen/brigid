@@ -13,6 +13,9 @@ __pycache__/
 # OS
 .DS_Store
 
+# Images (avoid committing stray photos/screenshots)
+*.jpg
+
 # Editor
 .vscode/
 .idea/
