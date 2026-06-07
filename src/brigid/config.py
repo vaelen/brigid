@@ -44,6 +44,7 @@ class OllamaConfig:
 class BrigidConfig:
     default: str | None = None
     host: str = "http://localhost:11434"
+    personality: str | None = None
 
 
 @dataclass(frozen=True)
@@ -135,11 +136,45 @@ class Config:
             raise ConfigError(f"active model {name!r} not found in profiles")
         return (name, resolved)
 
+    def personalities_dir(self) -> Path:
+        if self.source_path is not None:
+            return self.source_path.parent / "personalities"
+        return DEFAULT_CONFIG_PATH.parent / "personalities"
+
+    def load_personality(self, name: str) -> str | None:
+        base = self.personalities_dir().resolve()
+        for suffix in ("", ".md", ".txt"):
+            candidate = (base / f"{name}{suffix}").resolve()
+            try:
+                candidate.relative_to(base)
+            except ValueError:
+                continue
+            if candidate.is_file():
+                return candidate.read_text(encoding="utf-8")
+        return None
+
+    def list_personalities(self) -> list[str]:
+        base = self.personalities_dir()
+        if not base.is_dir():
+            return []
+        names: set[str] = set()
+        for entry in base.iterdir():
+            if not entry.is_file():
+                continue
+            stem = entry.name
+            for ext in (".md", ".txt"):
+                if stem.endswith(ext):
+                    stem = stem[: -len(ext)]
+                    break
+            names.add(stem)
+        return sorted(names)
+
 
 def _build_brigid(d: dict[str, Any]) -> BrigidConfig:
     return BrigidConfig(
         default=d.get("default"),
         host=d.get("host", BrigidConfig.host),
+        personality=d.get("personality"),
     )
 
 
