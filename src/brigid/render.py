@@ -22,9 +22,15 @@ class RichRenderer:
     """rich-based Renderer that prints assistant tokens live, panels for tool
     calls, and dim-italic for the model's `thinking` field."""
 
-    def __init__(self, console: Console | None = None, show_thinking: bool = False) -> None:
+    def __init__(
+        self,
+        console: Console | None = None,
+        show_thinking: bool = False,
+        assistant_label: str = "brigid",
+    ) -> None:
         self.console = console or Console()
         self.show_thinking = show_thinking
+        self.assistant_label = assistant_label
         self._in_assistant = False
         self._in_thinking = False
         self._status: Status | None = None
@@ -34,7 +40,7 @@ class RichRenderer:
             self.console.print()
             self._in_thinking = False
         if not self._in_assistant:
-            self.console.print(Text("brigid: ", style="bold green"), end="")
+            self.console.print(Text(f"{self.assistant_label}: ", style="bold green"), end="")
             self._in_assistant = True
         # Print as plain text — disable rich markup so model output isn't reinterpreted.
         self.console.print(content, end="", highlight=False, markup=False)

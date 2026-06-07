@@ -33,6 +33,7 @@ class _RendererProto(Protocol):
 
     console: Any
     show_thinking: bool
+    assistant_label: str
 
     def on_error(self, err: BaseException) -> None: ...
 
@@ -94,6 +95,7 @@ async def run(cfg: Config) -> int:
                     break
                 continue
 
+            renderer.assistant_label = active.personality or "brigid"
             session.add_user(line)
             turn_task = asyncio.create_task(session.run_turn())
             try:

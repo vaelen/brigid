@@ -31,6 +31,7 @@ class _FakeRenderer:
     def __init__(self) -> None:
         self.console = _FakeConsole()
         self.show_thinking = False
+        self.assistant_label = "brigid"
 
     def on_error(self, err: BaseException) -> None:
         self.console.print(f"error: {err}")
