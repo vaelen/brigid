@@ -15,10 +15,10 @@ embedded newlines is the only workaround).
   - **Enter** inserts a newline.
   - **Alt+Enter** (equivalently **Esc** then **Enter**) submits the whole block
     as one user turn.
-- A persistent **bottom toolbar** shows the key hint while the prompt is active:
-  `Alt+Enter to send · Enter for newline`.
-- Permission prompts (`permission>`, `pattern>`) are **unchanged** — single-line,
-  no toolbar.
+- The key hint is shown once in the **startup banner**, alongside the existing
+  `/help for commands · Ctrl-D to quit` line, e.g.:
+  `/help for commands · Alt+Enter to send, Enter for newline · Ctrl-D to quit`.
+- Permission prompts (`permission>`, `pattern>`) are **unchanged** — single-line.
 
 ## Implementation
 
@@ -28,7 +28,6 @@ Single call site: `repl.py`, the main input read (currently `repl.py:85`).
 line = await psession.prompt_async(
     FormattedText([("class:prompt", "you> ")]),
     multiline=True,
-    bottom_toolbar=_input_toolbar(),
 )
 ```
 
@@ -36,9 +35,10 @@ line = await psession.prompt_async(
   constructor, so the shared `psession` used by the permission/pattern prompts
   in `render.py` stays single-line (its `prompt_async` calls don't pass
   `multiline`, and the session default is off).
-- `_input_toolbar()` is a small pure helper returning the toolbar text
-  (`FormattedText` or a plain `str`). Keeping it a named helper keeps logic out
-  of the interactive loop and makes the hint string unit-testable.
+
+The hint is added to the banner in `_print_banner` (`repl.py:334`), extending
+the existing `[dim]/help for commands · Ctrl-D to quit[/dim]` line with the
+`Alt+Enter to send, Enter for newline` text.
 
 No changes are needed elsewhere:
 - `session.add_user(line)` already accepts the full string, so a multi-line
@@ -52,9 +52,9 @@ No changes are needed elsewhere:
 ## Testing
 
 - The REPL loop is interactive prompt_toolkit wiring and is not unit-testable
-  without a pty. To keep something tested, the hint lives in `_input_toolbar()`
-  and gets a unit test asserting it mentions `Alt+Enter` and `Enter`.
-- End-to-end behavior (Enter = newline, Alt+Enter = submit, toolbar visible,
+  without a pty. The change is two static edits (one kwarg, one banner string),
+  so there is no new logic to unit-test.
+- End-to-end behavior (Enter = newline, Alt+Enter = submit, banner hint visible,
   permission prompts still single-line) is verified manually / via
   `scripts/smoke.py`.
 
