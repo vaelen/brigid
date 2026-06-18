@@ -19,6 +19,7 @@ from brigid.config import Config, OllamaConfig
 from brigid.errors import BrigidError, MCPConnectionError
 from brigid.llm import OllamaBackend
 from brigid.permissions import PermissionGate
+from brigid.references import AtFileCompleter, expand_references
 from brigid.render import RichRenderer, make_permission_prompter
 from brigid.session import ConversationSession
 from brigid.tools import ToolRegistry
@@ -80,11 +81,16 @@ async def run(cfg: Config) -> int:
 
         _print_banner(console, active, registry)
 
+        fs_root = Path(cfg.tools.fs.root)
+        completer = AtFileCompleter(fs_root)
+
         while True:
             try:
                 line = await psession.prompt_async(
                     FormattedText([("class:prompt", "you> ")]),
                     multiline=True,
+                    completer=completer,
+                    complete_while_typing=True,
                 )
             except (EOFError, KeyboardInterrupt):
                 console.print()
@@ -98,8 +104,12 @@ async def run(cfg: Config) -> int:
                     break
                 continue
 
+            expanded = await expand_references(line, fs_root, gate)
+            if expanded is None:
+                console.print("[dim]@-reference denied — turn skipped[/dim]")
+                continue
             renderer.assistant_label = active.personality or "brigid"
-            session.add_user(line)
+            session.add_user(expanded)
             turn_task = asyncio.create_task(session.run_turn())
             try:
                 await turn_task
