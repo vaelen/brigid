@@ -82,7 +82,10 @@ async def run(cfg: Config) -> int:
 
         while True:
             try:
-                line = await psession.prompt_async(FormattedText([("class:prompt", "you> ")]))
+                line = await psession.prompt_async(
+                    FormattedText([("class:prompt", "you> ")]),
+                    multiline=True,
+                )
             except (EOFError, KeyboardInterrupt):
                 console.print()
                 break
@@ -331,7 +334,9 @@ def _print_banner(console, active: _ActiveModel, registry: ToolRegistry) -> None
         f"([dim]{active.cfg.model}[/dim]) · host={active.cfg.host} · "
         f"{len(registry)} tool(s) loaded"
     )
-    console.print("[dim]/help for commands · Ctrl-D to quit[/dim]")
+    console.print(
+        "[dim]/help for commands · Alt+Enter to send, Enter for newline · Ctrl-D to quit[/dim]"
+    )
 
 
 class _suppress_cancel:
