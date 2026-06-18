@@ -11,6 +11,7 @@ import httpx
 
 from brigid.config import BashToolsConfig, FsToolsConfig, WebToolsConfig
 from brigid.errors import ToolError
+from brigid.paths import resolve_path as _resolve
 from brigid.tools import Tool
 
 # ----------------------------------------------------------------------------
@@ -18,21 +19,6 @@ from brigid.tools import Tool
 # ----------------------------------------------------------------------------
 
 _RESULT_PREVIEW_BYTES = 4_000  # for inline display when results get echoed
-
-
-def _resolve(root: Path, raw: str) -> Path:
-    """Resolve a (possibly relative) path against root and confine to root.
-    Raises ToolError on traversal outside root."""
-    p = Path(raw).expanduser()
-    p = (root / p).resolve() if not p.is_absolute() else p.resolve()
-    root_resolved = root.resolve()
-    # Allow if root is "/" (no confinement) or path is inside root.
-    if str(root_resolved) != "/":
-        try:
-            p.relative_to(root_resolved)
-        except ValueError as e:
-            raise ToolError(f"path {p} escapes configured fs root {root_resolved}") from e
-    return p
 
 
 # ----------------------------------------------------------------------------
