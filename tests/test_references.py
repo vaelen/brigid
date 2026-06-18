@@ -5,9 +5,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from prompt_toolkit.document import Document
+
 from brigid.config import PermissionsConfig
 from brigid.permissions import PermissionGate
-from brigid.references import expand_references
+from brigid.references import AtFileCompleter, expand_references
 
 
 def _allow_gate() -> PermissionGate:
@@ -68,3 +70,34 @@ async def test_traversal_left_literal(tmp_path: Path) -> None:
     root.mkdir()
     out = await expand_references("see @../passwd", root, _allow_gate())
     assert out == "see @../passwd"
+
+
+def _complete(completer: AtFileCompleter, text: str) -> list[str]:
+    doc = Document(text)  # cursor defaults to end of text
+    return [c.text for c in completer.get_completions(doc, None)]
+
+
+def test_completer_matches_files(tmp_path: Path) -> None:
+    (tmp_path / "alpha.txt").write_text("", encoding="utf-8")
+    (tmp_path / "beta.txt").write_text("", encoding="utf-8")
+    out = _complete(AtFileCompleter(tmp_path), "see @al")
+    assert "alpha.txt" in out
+    assert "beta.txt" not in out
+
+
+def test_completer_dir_trailing_slash(tmp_path: Path) -> None:
+    (tmp_path / "sub").mkdir()
+    out = _complete(AtFileCompleter(tmp_path), "@su")
+    assert "sub/" in out
+
+
+def test_completer_no_trigger_midword(tmp_path: Path) -> None:
+    (tmp_path / "vaelen.org").write_text("", encoding="utf-8")
+    out = _complete(AtFileCompleter(tmp_path), "andrew@vael")
+    assert out == []
+
+
+def test_completer_empty_frag_lists_root(tmp_path: Path) -> None:
+    (tmp_path / "alpha.txt").write_text("", encoding="utf-8")
+    out = _complete(AtFileCompleter(tmp_path), "@")
+    assert "alpha.txt" in out
