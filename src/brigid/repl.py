@@ -14,6 +14,7 @@ import tomli_w
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.history import FileHistory
+from prompt_toolkit.key_binding import KeyBindings
 
 from brigid.config import Config, OllamaConfig
 from brigid.errors import BrigidError, MCPConnectionError
@@ -44,6 +45,47 @@ class _ActiveModel:
     name: str
     cfg: OllamaConfig
     personality: str | None = None
+
+
+def _input_key_bindings() -> KeyBindings:
+    """Key bindings for the input prompt: shell-style backslash continuation.
+
+    Enter submits, *unless* the current line ends with a backslash, in which
+    case it inserts a newline so the message can continue. When a completion is
+    being navigated, Enter accepts it instead of submitting.
+    """
+    kb = KeyBindings()
+
+    @kb.add("enter")
+    def _(event: Any) -> None:
+        buf = event.current_buffer
+        state = buf.complete_state
+        if state is not None and state.current_completion is not None:
+            buf.apply_completion(state.current_completion)
+            return
+        if buf.document.current_line_before_cursor.endswith("\\"):
+            buf.insert_text("\n")
+        else:
+            buf.validate_and_handle()
+
+    return kb
+
+
+def _strip_continuations(text: str) -> str:
+    """Drop continuation backslashes, keeping the newline they introduced.
+
+    A backslash immediately before a newline was a continuation marker the user
+    typed to keep going, not literal content, so remove it. A backslash that is
+    not before a newline (mid-line, or trailing the final line) is left intact.
+    """
+    return text.replace("\\\n", "\n")
+
+
+def _prompt_continuation(width: int, line_number: int, wrap_count: int) -> str:
+    """Marker drawn at the start of each continued input line."""
+    if wrap_count > 0:
+        return " " * width  # soft-wrapped within one logical line: no marker
+    return ("." * max(0, width - 2) + "> ")[:width]
 
 
 async def run(cfg: Config) -> int:
@@ -83,6 +125,7 @@ async def run(cfg: Config) -> int:
 
         fs_root = Path(cfg.tools.fs.root)
         completer = AtFileCompleter(fs_root)
+        key_bindings = _input_key_bindings()
 
         while True:
             try:
@@ -91,11 +134,14 @@ async def run(cfg: Config) -> int:
                     multiline=True,
                     completer=completer,
                     complete_while_typing=True,
+                    key_bindings=key_bindings,
+                    prompt_continuation=_prompt_continuation,
                 )
             except (EOFError, KeyboardInterrupt):
                 console.print()
                 break
 
+            line = _strip_continuations(line)
             stripped = line.strip()
             if not stripped:
                 continue
@@ -286,9 +332,9 @@ _HELP_TEXT = """\
 [bold]slash commands[/bold]
   /help                 show this help
   /tools                list registered tools
-  /model [name]         list models or switch to a defined profile
-  /system [text|clear]  show, set, or clear the system prompt
-  /personality [name]   load a personality; "none" to clear; no arg lists
+  /model \\[name]         list models or switch to a defined profile
+  /system \\[text|clear]  show, set, or clear the system prompt
+  /personality \\[name]   load a personality; "none" to clear; no arg lists
   /clear                wipe conversation history
   /save <path>          save session to a JSON file
   /load <path>          load session from a JSON file
@@ -296,6 +342,7 @@ _HELP_TEXT = """\
   /deny <pattern>       add a permission deny pattern
   /thinking on|off      show or hide model thinking
   /exit                 quit
+end a line with a trailing \\ to continue onto the next line; Enter sends.
 press [bold]Ctrl-C[/bold] to cancel an in-flight turn; [bold]Ctrl-D[/bold] to quit.
 """
 
@@ -345,7 +392,7 @@ def _print_banner(console, active: _ActiveModel, registry: ToolRegistry) -> None
         f"{len(registry)} tool(s) loaded"
     )
     console.print(
-        "[dim]/help for commands · Alt+Enter to send, Enter for newline · Ctrl-D to quit[/dim]"
+        "[dim]/help for commands · end a line with \\ to continue · Enter sends · Ctrl-D to quit[/dim]"
     )
 
 

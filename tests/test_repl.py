@@ -3,8 +3,18 @@
 
 from __future__ import annotations
 
+from prompt_toolkit import PromptSession
+from prompt_toolkit.input import create_pipe_input
+from prompt_toolkit.output import DummyOutput
+
 from brigid.config import from_dict, load
-from brigid.repl import _ActiveModel, _apply_startup_personality, _handle_slash
+from brigid.repl import (
+    _ActiveModel,
+    _apply_startup_personality,
+    _handle_slash,
+    _input_key_bindings,
+    _strip_continuations,
+)
 
 RAW = {
     "brigid": {"default": "hermes"},
@@ -40,6 +50,55 @@ class _FakeRenderer:
 def _active(cfg):
     name, ocfg = cfg.active()
     return _ActiveModel(name, ocfg)
+
+
+# ---------------------------------------------------------------------------
+# Multi-line input: backslash continuation
+# ---------------------------------------------------------------------------
+
+
+def _run_input(text: str) -> str:
+    """Drive a PromptSession with our key bindings over piped input.
+
+    `text` is the raw key stream; ``\\r`` stands for Enter. Returns whatever
+    the prompt accepts (the raw buffer, before continuation stripping).
+    """
+    with create_pipe_input() as inp:
+        inp.send_text(text)
+        session: PromptSession[str] = PromptSession(
+            input=inp,
+            output=DummyOutput(),
+            key_bindings=_input_key_bindings(),
+            multiline=True,
+        )
+        return session.prompt()
+
+
+def test_strip_continuations_drops_backslash_keeps_newline():
+    assert _strip_continuations("foo\\\nbar") == "foo\nbar"
+
+
+def test_strip_continuations_handles_multiple_lines():
+    assert _strip_continuations("a\\\nb\\\nc") == "a\nb\nc"
+
+
+def test_strip_continuations_leaves_plain_text():
+    assert _strip_continuations("hello world") == "hello world"
+
+
+def test_strip_continuations_keeps_non_continuation_backslash():
+    assert _strip_continuations("a\\b") == "a\\b"  # not before a newline
+    assert _strip_continuations("ends\\") == "ends\\"  # trailing, no newline
+
+
+def test_enter_submits_single_line():
+    assert _run_input("hello\r") == "hello"
+
+
+def test_trailing_backslash_continues_then_submits():
+    raw = _run_input("foo\\\rbar\r")
+    assert raw == "foo\\\nbar"  # backslash + newline preserved in the buffer
+    assert _strip_continuations(raw) == "foo\nbar"  # marker stripped for the model
 
 
 async def test_model_no_arg_lists_profiles():
